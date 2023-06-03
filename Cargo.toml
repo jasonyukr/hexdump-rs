@@ -1,0 +1,11 @@
+[package]
+name = "hexdump-rs"
+version = "0.1.0"
+edition = "2021"
+
+# Used for flamegraph
+[profile.release]
+debug = true
+
+[dependencies]
+clap = { version = "4.3.0", features = ["derive"] }
