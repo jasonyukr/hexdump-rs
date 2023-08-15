@@ -4,6 +4,9 @@
 
 A rewrite of `hexdump` in Rust, which offers up to a 14x speedup
 
+Test with 10M from `/dev/random` file:
+![Speed test with hyperfine on dev-random](./img/dev-random.png)
+
 Test with a (semi) random 7.8M file:
 ![Speed test with hyperfine on test.mca](./img/test.mca.png)
 

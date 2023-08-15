@@ -18,9 +18,10 @@ fn render_ascii(w: &mut impl Write, bytes: &mut [u8]) -> io::Result<()> {
     let mut i = 0;
     while i < bytes.len() {
         let b = &mut bytes[i];
-        if !(b'!' <= *b && *b <= b'~') && *b != b' ' {
-            *b = INVALID_ASCII as u8;
-        }
+        *b = match b {
+            b'"'..=b'}' | b' ' => *b,
+            _ => INVALID_ASCII,
+        };
         i += 1;
     }
     w.write(bytes)?;
@@ -43,21 +44,17 @@ macro_rules! byte_to_arr {
 }
 
 /// Render `bytes` to the passed `Write` using their two-character hexadecimal repr
-fn render_bytes(w: &mut impl Write, bytes: &[u8], count: usize) {
-    let mut i = 0;
-
-    while i < bytes.len() {
-        let b = bytes[i];
-        if count > i {
-            w.write(&byte_to_arr!(b)).unwrap();
-        } else {
-            w.write(b"  ").unwrap();
-        }
-        if i != bytes.len() - 1 {
-            w.write(b" ").unwrap();
-        }
-        i += 1;
+fn render_bytes(w: &mut impl Write, bytes: &[u8], count: usize) -> io::Result<()> {
+    for b in bytes.iter().take(count) {
+        w.write(&byte_to_arr!(b))?;
+        w.write(b" ")?;
     }
+
+    if bytes.len() > count {
+        w.write(&b"   ".repeat(bytes.len() - count))?;
+    }
+
+    Ok(())
 }
 
 /// Skip n bytes before a reader
@@ -99,71 +96,71 @@ fn print_canonical(
 
     let mut bytes = [0u8; N];
     let mut i = skip_bytes(&mut read, skip)?;
-    let end = if length == usize::MAX {
-        None
-    } else {
-        Some(i + length)
-    };
-
+    let end = (i + length).max(usize::MAX);
     let mut b = [0u8; N];
     let mut read_count = read.read(&mut bytes)?;
 
-    // Whether the '*' char has been printed for the squeeze
-    let mut printed_squeeze = false;
-    // If we're actively suqeezing
-    let mut squeezing = false;
+    enum SqueezeStatus {
+        NotSqueezing,
+        NotYetPrintedSqueeze,
+        Squeezing,
+    }
 
-    // `00000000  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|\n` = 79 B
-    let mut line = Vec::with_capacity(79);
+    let mut squeeze_status = SqueezeStatus::NotSqueezing;
+
+    //  v---10---vv----------------------3N----------------------vv---------21--------v
+    // `00000000  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|\n`
+    let mut line = Vec::with_capacity(10 + N * 3 + 21);
+
     while read_count != 0 {
-        if let Some(end) = end {
-            if read_count + i > end {
-                read_count = end - i;
-            }
+        if read_count + i > end {
+            read_count = end - i;
         }
+
         if squeeze {
             b = *&bytes;
         }
-        //b.copy_from_slice(&bytes);
-        if !squeezing {
+
+        if matches!(squeeze_status, SqueezeStatus::NotSqueezing) {
             line.clear();
-            printed_squeeze = false;
             hex(&mut line, i)?;
             line.write(b"  ")?;
-            render_bytes(&mut line, &bytes[..8], read_count);
-            line.write(b"  ")?;
+            render_bytes(&mut line, &bytes[..8], read_count)?;
+            line.write(b" ")?;
             render_bytes(
                 &mut line,
                 &bytes[8..],
-                (read_count as isize - 8).max(0) as usize,
-            );
-            line.write(b"  |")?;
+                if read_count < 8 { 0 } else { read_count },
+            )?;
+            line.write(b" |")?;
 
             render_ascii(&mut line, &mut bytes[..read_count])?;
             line.write(b"|\n")?;
             out.write(&line)?;
         }
-        assert_eq!(line.capacity(), 79);
+        debug_assert_eq!(line.capacity(), 79);
         i += read_count;
-        if let Some(end) = end {
-            if i >= end {
-                break;
-            }
+        if i >= end {
+            break;
         }
 
         read_count = read.read(&mut bytes)?;
         if read_count == N && bytes == b && squeeze {
-            if !printed_squeeze {
-                out.write(b"*\n")?;
-                printed_squeeze = true;
-            }
-            squeezing = true;
+            squeeze_status = match squeeze_status {
+                SqueezeStatus::NotSqueezing => SqueezeStatus::NotYetPrintedSqueeze,
+                SqueezeStatus::NotYetPrintedSqueeze => {
+                    out.write(b"*\n")?;
+                    SqueezeStatus::Squeezing
+                }
+                SqueezeStatus::Squeezing => squeeze_status,
+            };
         } else {
-            squeezing = false;
+            squeeze_status = SqueezeStatus::NotSqueezing;
         }
     }
 
-    writeln!(out, "{:08x?}", i)?;
+    hex(out, i)?;
+    out.write(&[b'\n'])?;
     Ok(())
 }
 
