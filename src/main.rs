@@ -130,7 +130,7 @@ fn print_canonical(
             render_bytes(
                 &mut line,
                 &bytes[8..],
-                if read_count < 8 { 0 } else { read_count },
+                if read_count < 8 { 0 } else { read_count - 8 },
             )?;
             line.write(b" |")?;
 
