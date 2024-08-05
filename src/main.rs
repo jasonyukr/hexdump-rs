@@ -96,7 +96,7 @@ fn print_canonical(
 
     let mut bytes = [0u8; N];
     let mut i = skip_bytes(&mut read, skip)?;
-    let end = (i + length).max(usize::MAX);
+    let end = (i + length).min(usize::MAX);
     let mut b = [0u8; N];
     let mut read_count = read.read(&mut bytes)?;
 
