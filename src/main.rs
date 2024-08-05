@@ -19,7 +19,7 @@ fn render_ascii(w: &mut impl Write, bytes: &mut [u8]) -> io::Result<()> {
     while i < bytes.len() {
         let b = &mut bytes[i];
         *b = match b {
-            b'"'..=b'}' | b' ' => *b,
+            b'!'..=b'~' | b' ' => *b,
             _ => INVALID_ASCII,
         };
         i += 1;
