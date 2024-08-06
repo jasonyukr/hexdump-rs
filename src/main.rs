@@ -6,7 +6,14 @@ use std::{
 use clap::Parser;
 use cli::Cli;
 
+use std::io::IsTerminal;
+
 mod cli;
+
+enum ColorEnum {
+    Always,
+    Never
+}
 
 #[cfg(test)]
 mod test;
@@ -91,6 +98,7 @@ fn print_canonical(
     skip: usize,
     length: usize,
     squeeze: bool,
+    color: ColorEnum,
 ) -> io::Result<()> {
     const N: usize = 16;
 
@@ -123,7 +131,15 @@ fn print_canonical(
 
         if matches!(squeeze_status, SqueezeStatus::NotSqueezing) {
             line.clear();
+            match color {
+                ColorEnum::Always => { line.write(b"\x1b[90m")?; },
+                _ => {},
+            }
             hex(&mut line, i)?;
+            match color {
+                ColorEnum::Always => { line.write(b"\x1b[33m")?; },
+                _ => {},
+            }
             line.write(b"  ")?;
             render_bytes(&mut line, &bytes[..8], read_count)?;
             line.write(b" ")?;
@@ -132,6 +148,10 @@ fn print_canonical(
                 &bytes[8..],
                 if read_count < 8 { 0 } else { read_count - 8 },
             )?;
+            match color {
+                ColorEnum::Always => { line.write(b"\x1b[0m")?; },
+                _ => {},
+            }
             line.write(b" |")?;
 
             render_ascii(&mut line, &mut bytes[..read_count])?;
@@ -159,20 +179,39 @@ fn print_canonical(
         }
     }
 
-    hex(out, i)?;
-    out.write(&[b'\n'])?;
+    match color {
+        ColorEnum::Always => {
+            line.clear();
+            line.write(b"\x1b[90m")?;
+            hex(&mut line, i)?;
+            line.write(b"\x1b[0m")?;
+            line.write(&[b'\n'])?;
+            out.write(&line)?;
+        },
+        _ => {
+            hex(out, i)?;
+            out.write(&[b'\n'])?;
+        },
+    }
     Ok(())
 }
 
 fn run() -> io::Result<()> {
     let cli = Cli::parse();
+
+    let color : ColorEnum;
+    match cli.color.as_str() {
+        "always" => color = ColorEnum::Always,
+        "auto"   => if std::io::stdout().is_terminal() { color = ColorEnum::Always } else { color = ColorEnum::Never },
+        _        => color = ColorEnum::Never,
+    }
     let mut stdout = BufWriter::new(stdout().lock());
     if let Some(file) = cli.file {
         let read = BufReader::new(fs::File::open(file)?);
-        print_canonical(&mut stdout, read, cli.skip, cli.length, !cli.no_squeeze)?;
+        print_canonical(&mut stdout, read, cli.skip, cli.length, !cli.no_squeeze, color)?;
     } else {
         let read = BufReader::new(stdin().lock());
-        print_canonical(&mut stdout, read, cli.skip, cli.length, !cli.no_squeeze)?;
+        print_canonical(&mut stdout, read, cli.skip, cli.length, !cli.no_squeeze, color)?;
     }
 
     Ok(())

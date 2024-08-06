@@ -26,4 +26,8 @@ pub struct Cli {
     /// preceding group of output lines (except for the input offsets), are replaced with a line comprised of a single asterisk.
     #[arg(short = 'v', long)]
     pub no_squeeze: bool,
+
+    /// When to use terminal colours (always, auto, never). default is never
+    #[arg(short, long)]
+    pub color: String,
 }
