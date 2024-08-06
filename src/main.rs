@@ -199,7 +199,7 @@ fn print_canonical(
 fn run() -> io::Result<()> {
     let cli = Cli::parse();
 
-    let color : ColorEnum;
+    let color: ColorEnum;
     match cli.color.as_str() {
         "always" => color = ColorEnum::Always,
         "auto"   => if std::io::stdout().is_terminal() { color = ColorEnum::Always } else { color = ColorEnum::Never },

@@ -28,6 +28,6 @@ pub struct Cli {
     pub no_squeeze: bool,
 
     /// When to use terminal colours (always, auto, never). default is never
-    #[arg(short, long)]
+    #[arg(long, default_value = "never")]
     pub color: String,
 }
