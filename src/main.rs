@@ -7,6 +7,7 @@ use clap::Parser;
 use cli::Cli;
 
 use std::io::IsTerminal;
+use std::process;
 
 mod cli;
 
@@ -206,12 +207,17 @@ fn run() -> io::Result<()> {
         _        => color = ColorEnum::Never,
     }
     let mut stdout = BufWriter::new(stdout().lock());
+    let res;
     if let Some(file) = cli.file {
         let read = BufReader::new(fs::File::open(file)?);
-        print_canonical(&mut stdout, read, cli.skip, cli.length, !cli.no_squeeze, color)?;
+        res = print_canonical(&mut stdout, read, cli.skip, cli.length, !cli.no_squeeze, color);
     } else {
         let read = BufReader::new(stdin().lock());
-        print_canonical(&mut stdout, read, cli.skip, cli.length, !cli.no_squeeze, color)?;
+        res = print_canonical(&mut stdout, read, cli.skip, cli.length, !cli.no_squeeze, color);
+    }
+    match res {
+        Ok(_) => (),
+        Err(_) => process::exit(1),
     }
 
     Ok(())
