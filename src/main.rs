@@ -215,9 +215,8 @@ fn run() -> io::Result<()> {
         let read = BufReader::new(stdin().lock());
         res = print_canonical(&mut stdout, read, cli.skip, cli.length, !cli.no_squeeze, color);
     }
-    match res {
-        Ok(_) => (),
-        Err(_) => process::exit(1),
+    if let Err(_) = res {
+        process::exit(1);
     }
 
     Ok(())
